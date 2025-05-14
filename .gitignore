@@ -1,0 +1,17 @@
+# Ignore all files and folders
+/*
+
+# Whitelist the engine folders
+!/include
+!/interface
+!/source
+!/cmake
+
+# Whitelist the distribution files
+!/CMakeLists.txt
+!/LICENSE.txt
+!/README.md
+!/.gitignore
+
+# Remove all .DS_Store files (macOS pain)
+.DS_Store
