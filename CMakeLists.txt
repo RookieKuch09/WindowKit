@@ -21,13 +21,13 @@ include(CMakePackageConfigHelpers)
 if(WIN32)
     message(STATUS "Detected Windows platform. Using Win32 backend.")
     set(WINDOWKIT_BACKEND "Win32")
-    set(WINDOWKIT_DEFINES WINDOWKIT_WIN32_BACKEND)
+    set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_WIN32)
     set(WINDOWKIT_LINK_LIBS user32 gdi32 opengl32)
 
 elseif(APPLE)
     message(STATUS "Detected macOS platform. Using Cocoa backend.")
     set(WINDOWKIT_BACKEND "Cocoa")
-    set(WINDOWKIT_DEFINES WINDOWKIT_COCOA_BACKEND)
+    set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_COCOA)
     find_library(COCOA_FRAMEWORK Cocoa)
     set(WINDOWKIT_LINK_LIBS ${COCOA_FRAMEWORK})
 
@@ -41,7 +41,7 @@ else()
         message(STATUS "Detected libadwaita. Using Adwaita backend (${ADWAITA_VERSION}).")
         set(WINDOWKIT_BACKEND "Adwaita")
         set(WINDOWKIT_PKGTGT PkgConfig::ADWAITA)
-        set(WINDOWKIT_DEFINES WINDOWKIT_ADWAITA_BACKEND)
+        set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_ADWAITA)
 
     else()
         # If libadwaita is not found, try GTK4
@@ -73,15 +73,13 @@ message(STATUS "Configured WindowKit backend: ${WINDOWKIT_BACKEND}")
 file(GLOB_RECURSE SOURCES "source/**/*.cpp" "source/*.cpp" "source/**/*.mm")
 
 # Create the library
-add_library(WindowKit)
+add_library(WindowKit ${SOURCES})
 
 # Set include directories
 target_include_directories(WindowKit
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mosaic/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mosaic/inline>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/inline>
 )
 
 # Link dependencies
@@ -102,9 +100,8 @@ install(TARGETS WindowKit
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-# Install headers and inline files
+# Install headers
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/include)
-install(DIRECTORY inline/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/inline)
 
 # Install primary interface files
 install(DIRECTORY interface/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit)
@@ -127,7 +124,7 @@ write_basic_package_version_file(
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/WindowKitConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/WindowKitConfig.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/WindowKit
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/WindowKit"
 )
 
 # Install config files for package
