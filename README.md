@@ -63,44 +63,42 @@ int main()
 {
     try
     {
-        // Create the window descriptor
-        WindowKit::WindowDescriptor windowDescriptor = 
+        WindowKit::WindowDescriptor windowDescriptor =
         {
-            .Size = {800, 600},
             .Title = "New Window",
+            .Width = 800,
+            .Height = 600,
             .Resizable = false,
             .Fullscreen = false,
         };
 
-        // Create the window
-        WindowKit::Window window(windowDescriptor);
+    WindowKit::Window window(windowDescriptor);
 
-        // 'updating' flag to keep track of window state
-        bool updating = true;
+    window.Create();
 
-        // Main update loop
-        while (updating)
+    bool updating = true;
+
+    while (updating)
+    {
+        window.Update();
+
+        const auto& events = window.QueryEvents();
+
+        for (const auto& event : events)
         {
-            // Query all events from the window
-            WindowKit::EventList events = window.QueryEvents();
-
-            // Cycle through all events
-            for (WindowKit::Event& event : events)
+            if (event == WindowKit::Event::WindowClose)
             {
-                // Stop updating if the WindowClose event is triggered
-                if (event.Type == WindowKit::EventType::WindowClose)
-                {
-                    updating = false;
-                }
+                updating = false;
             }
-
-            // Update the window
-            window.Update();
         }
+
+        return 0;
     }
     catch (const WindowKit::Exception& error)
     {
         // Handle WindowKit error (WindowKit::Exception inherits std::exception, so similar usage)
+
+        return 1;
     }
 }
 ```

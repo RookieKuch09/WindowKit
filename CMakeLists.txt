@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_OBJCXX_COMPILER clang++)
 
+set(CMAKE_CXX_STANDARD 23)
+
 # Define the project
 project(WindowKit LANGUAGES CXX OBJCXX)
 
@@ -36,30 +38,36 @@ else()
     find_package(PkgConfig REQUIRED)
 
     # Try to find libadwaita first
-    pkg_check_modules(ADWAITA QUIET IMPORTED_TARGET libadwaita-1>=1.0)
-    if(TARGET PkgConfig::ADWAITA)
+    pkg_check_modules(ADWAITA QUIET libadwaita-1)
+    if(ADWAITA_FOUND)
         message(STATUS "Detected libadwaita. Using Adwaita backend (${ADWAITA_VERSION}).")
         set(WINDOWKIT_BACKEND "Adwaita")
-        set(WINDOWKIT_PKGTGT PkgConfig::ADWAITA)
         set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_ADWAITA)
+        set(WINDOWKIT_INCLUDE_DIRS ${ADWAITA_INCLUDE_DIRS})
+        set(WINDOWKIT_LINK_LIBS ${ADWAITA_LIBRARIES})
+        set(WINDOWKIT_CFLAGS ${ADWAITA_CFLAGS_OTHER})
 
     else()
         # If libadwaita is not found, try GTK4
-        pkg_check_modules(GTK4 QUIET IMPORTED_TARGET gtk4>=4.6)
-        if(TARGET PkgConfig::GTK4)
+        pkg_check_modules(GTK4 QUIET gtk4)
+        if(GTK4_FOUND)
             message(STATUS "Falling back to GTK4 (${GTK4_VERSION}). Using GTK4 backend.")
             set(WINDOWKIT_BACKEND "GTK4")
-            set(WINDOWKIT_PKGTGT PkgConfig::GTK4)
             set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_GTK4)
+            set(WINDOWKIT_INCLUDE_DIRS ${GTK4_INCLUDE_DIRS})
+            set(WINDOWKIT_LINK_LIBS ${GTK4_LIBRARIES})
+            set(WINDOWKIT_CFLAGS ${GTK4_CFLAGS_OTHER})
 
         else()
             # Fallback to GTK3 if GTK4 is not found
-            pkg_check_modules(GTK3 QUIET IMPORTED_TARGET gtk+-3.0>=3.14)
-            if(TARGET PkgConfig::GTK3)
+            pkg_check_modules(GTK3 QUIET gtk+-3.0)
+            if(GTK3_FOUND)
                 message(STATUS "Falling back to GTK3 (${GTK3_VERSION}). Using GTK3 backend.")
                 set(WINDOWKIT_BACKEND "GTK3")
-                set(WINDOWKIT_PKGTGT PkgConfig::GTK3)
                 set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_GTK3)
+                set(WINDOWKIT_INCLUDE_DIRS ${GTK3_INCLUDE_DIRS})
+                set(WINDOWKIT_LINK_LIBS ${GTK3_LIBRARIES})
+                set(WINDOWKIT_CFLAGS ${GTK3_CFLAGS_OTHER})
             else()
                 message(FATAL_ERROR "No supported GUI backend found. Please install libadwaita, GTK4, or GTK3.")
             endif()
@@ -82,15 +90,15 @@ target_include_directories(WindowKit
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/include>
 )
 
+# Platform-specific include dirs and compile flags
+if(UNIX AND NOT APPLE)
+    target_include_directories(WindowKit PUBLIC ${WINDOWKIT_INCLUDE_DIRS})
+    target_compile_options(WindowKit PUBLIC ${WINDOWKIT_CFLAGS})
+endif()
+
 # Link dependencies
 target_compile_definitions(WindowKit PUBLIC ${WINDOWKIT_DEFINES})
-if(WIN32)
-    target_link_libraries(WindowKit PUBLIC ${WINDOWKIT_LINK_LIBS})
-elseif(APPLE)
-    target_link_libraries(WindowKit PUBLIC ${WINDOWKIT_LINK_LIBS})
-else()
-    target_link_libraries(WindowKit PUBLIC ${WINDOWKIT_PKGTGT})
-endif()
+target_link_libraries(WindowKit PUBLIC ${WINDOWKIT_LINK_LIBS})
 
 # Install targets and files
 install(TARGETS WindowKit

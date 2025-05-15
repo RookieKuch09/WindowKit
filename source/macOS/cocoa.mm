@@ -1,8 +1,8 @@
-#include <AppKit/AppKit.h>
 #if defined(WINDOWKIT_BACKEND_COCOA)
 
 #include "../../include/window.hpp"
 
+#include <AppKit/AppKit.h>
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
 
