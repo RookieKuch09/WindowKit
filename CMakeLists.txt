@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 # Set the compilers to use
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_OBJCXX_COMPILER clang++)
-
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Define the project
 project(WindowKit LANGUAGES CXX OBJCXX)
@@ -59,18 +60,7 @@ else()
             set(WINDOWKIT_CFLAGS ${GTK4_CFLAGS_OTHER})
 
         else()
-            # Fallback to GTK3 if GTK4 is not found
-            pkg_check_modules(GTK3 QUIET gtk+-3.0)
-            if(GTK3_FOUND)
-                message(STATUS "Falling back to GTK3 (${GTK3_VERSION}). Using GTK3 backend.")
-                set(WINDOWKIT_BACKEND "GTK3")
-                set(WINDOWKIT_DEFINES WINDOWKIT_BACKEND_GTK3)
-                set(WINDOWKIT_INCLUDE_DIRS ${GTK3_INCLUDE_DIRS})
-                set(WINDOWKIT_LINK_LIBS ${GTK3_LIBRARIES})
-                set(WINDOWKIT_CFLAGS ${GTK3_CFLAGS_OTHER})
-            else()
-                message(FATAL_ERROR "No supported GUI backend found. Please install libadwaita, GTK4, or GTK3.")
-            endif()
+            message(FATAL_ERROR "No supported GUI backend found. Please install libadwaita, or GTK4")
         endif()
     endif()
 endif()

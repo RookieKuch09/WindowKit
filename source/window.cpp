@@ -20,6 +20,8 @@ WindowKit::EventList::~EventList()
     if (mEvents)
     {
         delete[] mEvents;
+
+        mEvents = nullptr;
     }
 }
 
@@ -55,7 +57,7 @@ WindowKit::EventList& WindowKit::EventList::operator=(const EventList& other)
 
     if (mEvents)
     {
-        delete mEvents;
+        delete[] mEvents;
     }
 
     mSize = other.mSize;
@@ -79,7 +81,7 @@ WindowKit::EventList& WindowKit::EventList::operator=(EventList&& other) noexcep
 
     if (mEvents)
     {
-        delete mEvents;
+        delete[] mEvents;
     }
 
     mSize = other.mSize;
@@ -142,25 +144,27 @@ void WindowKit::EventList::Append(Event event)
 {
     if (mSize == mOccupied)
     {
-        unsigned int oldSize = mSize;
+        unsigned int newSize = (mSize == 0) ? 1 : mSize * 2;
 
         if (mSize == 0)
         {
-            mSize = 1;
+            mEvents = new Event[newSize];
         }
-
-        mSize *= 2;
-
-        Event* newEvents = new Event[mSize];
-
-        for (unsigned int index = 0; index < mOccupied; index++)
+        else
         {
-            newEvents[index] = mEvents[index];
+            Event* newEvents = new Event[newSize];
+
+            for (unsigned int index = 0; index < mOccupied; index++)
+            {
+                newEvents[index] = mEvents[index];
+            }
+
+            delete[] mEvents;
+
+            mEvents = newEvents;
         }
 
-        delete[] mEvents;
-
-        mEvents = newEvents;
+        mSize = newSize;
     }
 
     mEvents[mOccupied] = event;
@@ -173,6 +177,8 @@ void WindowKit::EventList::Purge()
     if (mEvents)
     {
         delete[] mEvents;
+
+        mEvents = nullptr;
     }
 
     mSize = 0;

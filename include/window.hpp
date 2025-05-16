@@ -20,13 +20,6 @@ namespace WindowKit
     {
         WindowClose,
         WindowResize,
-        WindowMove,
-        WindowMinimise,
-        WindowMaximise,
-
-        KeyboardInput,
-        MouseInput,
-        CursorMovement,
     };
 
     struct EventList

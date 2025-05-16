@@ -12,6 +12,8 @@
 !/LICENSE.txt
 !/README.md
 !/.gitignore
+!/install-debug.sh
+!/install-release.sh
 
 # Remove all .DS_Store files (macOS pain)
 .DS_Store
