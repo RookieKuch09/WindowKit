@@ -15,19 +15,19 @@ public:
     void Create();
     void Update();
 
-    bool Active();
+    void ApplyFullscreen();
 
-    NSWindow* Window;
-    id Delegate;
-    bool IsOpen;
-
+    bool Running;
+    bool& Fullscreen;
+    bool PreviousFullscreen;
     unsigned int Width;
     unsigned int Height;
     const char* Title;
-
     bool Resizable;
-    bool& Fullscreen;
-    bool LastFrameFullscreen;
+    bool Resized;
+
+    NSWindow* Window;
+    id Delegate;
 };
 
 @interface WindowDelegate : NSObject <NSWindowDelegate>
@@ -35,30 +35,56 @@ public:
 @end
 
 @implementation WindowDelegate
+
 - (void)windowWillClose:(NSNotification*)notification
 {
     if (self.Implementation)
     {
-        ((WindowKit::Window::Implementation*)self.Implementation)->IsOpen = false;
+        self.Implementation->Running = false;
+    }
+}
+
+- (void)windowDidResize:(NSNotification*)notification
+{
+    if (self.Implementation and self.Implementation->Window)
+    {
+        NSRect frame = [self.Implementation->Window frame];
+        self.Implementation->Width = frame.size.width;
+        self.Implementation->Height = frame.size.height;
+        self.Implementation->Resized = true;
     }
 }
 
 @end
 
 WindowKit::Window::Implementation::Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen)
-    : Window(nullptr), Delegate(nil), IsOpen(true), Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), LastFrameFullscreen(false)
+    : Running(true), Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), PreviousFullscreen(false), Window(nil), Delegate(nil)
 {
 }
 
 WindowKit::Window::Implementation::~Implementation()
 {
-    [Window close];
-    Delegate = nil;
+    if (Window)
+    {
+        [Window close];
+        [Window release];
+        Window = nil;
+    }
+
+    if (Delegate)
+    {
+        [Delegate release];
+        Delegate = nil;
+    }
 }
 
 void WindowKit::Window::Implementation::Create()
 {
-    NSRect frame = NSMakeRect(100, 100, Width, Height);
+    if (not NSApp)
+    {
+        [NSApplication sharedApplication];
+    }
+
     NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable;
 
     if (Resizable)
@@ -66,21 +92,40 @@ void WindowKit::Window::Implementation::Create()
         style |= NSWindowStyleMaskResizable;
     }
 
-    Window = [[NSWindow alloc] initWithContentRect:frame styleMask:style backing:NSBackingStoreBuffered defer:NO];
+    NSRect frame = NSMakeRect(100, 100, Width, Height);
 
-    [Window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
+    Window = [[NSWindow alloc] initWithContentRect:frame styleMask:style backing:NSBackingStoreBuffered defer:NO];
 
     [Window setTitle:[NSString stringWithUTF8String:Title]];
     [Window makeKeyAndOrderFront:nil];
 
+    if (Resizable)
+    {
+        [Window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
+    }
+    else
+    {
+        [[Window standardWindowButton:NSWindowZoomButton] setHidden:YES];
+    }
+
     Delegate = [[WindowDelegate alloc] init];
+
     ((WindowDelegate*)Delegate).Implementation = this;
+
     [Window setDelegate:Delegate];
+
+    if (Fullscreen and Resizable)
+    {
+        ApplyFullscreen();
+
+        PreviousFullscreen = true;
+    }
 }
 
 void WindowKit::Window::Implementation::Update()
 {
-    NSEvent* event;
+    NSEvent* event = nil;
+
     do
     {
         event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
@@ -90,20 +135,32 @@ void WindowKit::Window::Implementation::Update()
             [NSApp sendEvent:event];
             [NSApp updateWindows];
         }
-    } while (event);
+    } while (event != nil);
 
-    if (Fullscreen != LastFrameFullscreen)
+    if (([Window styleMask] & NSWindowStyleMaskFullScreen) == NSWindowStyleMaskFullScreen)
     {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [Window toggleFullScreen:nil];
-        });
-        LastFrameFullscreen = Fullscreen;
+        Fullscreen = true;
+
+        PreviousFullscreen = true;
+    }
+    else if ((Fullscreen != PreviousFullscreen) and Resizable)
+    {
+        ApplyFullscreen();
+
+        PreviousFullscreen = Fullscreen;
     }
 }
 
-bool WindowKit::Window::Implementation::Active()
+void WindowKit::Window::Implementation::ApplyFullscreen()
 {
-    return IsOpen;
+    if (not Window)
+    {
+        return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [Window toggleFullScreen:nil];
+    });
 }
 
 WindowKit::Window::~Window()
@@ -114,8 +171,6 @@ WindowKit::Window::~Window()
 void WindowKit::Window::Initialise()
 {
     mImplementation = new Implementation(mWidth, mHeight, mTitle, mResizable, mFullscreen);
-
-    [NSApplication sharedApplication];
 }
 
 void WindowKit::Window::Create()
@@ -129,9 +184,16 @@ void WindowKit::Window::Update()
 
     mEvents.Purge();
 
-    if (not mImplementation->Active())
+    if (not mImplementation->Running)
     {
         mEvents.Append(Event::WindowClose);
+    }
+
+    if (mImplementation->Resized)
+    {
+        mEvents.Append(Event::WindowResize);
+
+        mImplementation->Resized = false;
     }
 }
 
