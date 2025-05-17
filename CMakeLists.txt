@@ -77,7 +77,9 @@ add_library(WindowKit ${SOURCES})
 target_include_directories(WindowKit
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inline>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/inline>
 )
 
 # Platform-specific include dirs and compile flags
@@ -100,6 +102,7 @@ install(TARGETS WindowKit
 
 # Install headers
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/include)
+install(DIRECTORY inline/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit/inline)
 
 # Install primary interface files
 install(DIRECTORY interface/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/WindowKit)

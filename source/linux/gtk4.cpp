@@ -8,7 +8,7 @@
 class WindowKit::Window::Implementation
 {
 public:
-    Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen);
+    Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen);
     ~Implementation();
 
     void Create();
@@ -19,8 +19,8 @@ public:
     bool Running;
     bool& Fullscreen;
     bool PreviousFullscreen;
-    unsigned int Width;
-    unsigned int Height;
+    unsigned int& Width;
+    unsigned int& Height;
     const char* Title;
     bool Resizable;
     bool Resized;
@@ -28,13 +28,14 @@ public:
     GtkApplication* Application;
     GtkApplicationWindow* Window;
 
+    GtkWidget* Content;
+
     static void OnActivate(GApplication* application, gpointer userData);
     static void OnClose(GtkWindow* window, gpointer userData);
 };
 
-WindowKit::Window::Implementation::Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen)
-    : Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen),
-      Running(true), Application(nullptr), Window(nullptr), Resized(false)
+WindowKit::Window::Implementation::Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen)
+    : Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), Running(true), Application(nullptr), Window(nullptr), Resized(false), Content(nullptr)
 {
 }
 
@@ -67,10 +68,8 @@ void WindowKit::Window::Implementation::Update()
         PreviousFullscreen = Fullscreen;
     }
 
-    GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(Window));
-
-    unsigned int width = gdk_surface_get_width(surface);
-    unsigned int height = gdk_surface_get_height(surface);
+    unsigned int width = gtk_widget_get_width(Content);
+    unsigned int height = gtk_widget_get_height(Content);
 
     Resized = width != Width or height != Height;
 
@@ -108,6 +107,10 @@ void WindowKit::Window::Implementation::OnActivate(GApplication* application, gp
     gtk_window_set_resizable(GTK_WINDOW(self->Window), self->Resizable);
     gtk_widget_set_visible(GTK_WIDGET(self->Window), TRUE);
 
+    self->Content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_window_set_child(GTK_WINDOW(self->Window), self->Content);
+    gtk_widget_set_visible(self->Content, TRUE);
+
     self->PreviousFullscreen = not self->Fullscreen;
 
     self->ApplyFullscreen();
@@ -139,16 +142,14 @@ void WindowKit::Window::Update()
 {
     mImplementation->Update();
 
-    mEvents.Purge();
-
     if (not mImplementation->Running)
     {
-        mEvents.Append(Event::WindowClose);
+        CallCallback(WindowClose{});
     }
 
     if (mImplementation->Resized)
     {
-        mEvents.Append(Event::WindowResize);
+        CallCallback(WindowResize{.Width = mWidth, .Height = mHeight});
 
         mImplementation->Resized = false;
     }

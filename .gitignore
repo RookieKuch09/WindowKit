@@ -5,6 +5,7 @@
 !/include
 !/interface
 !/source
+!/inline
 !/cmake
 
 # Whitelist the distribution files

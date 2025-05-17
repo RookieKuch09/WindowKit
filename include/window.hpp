@@ -1,7 +1,10 @@
 #pragma once
 
 #include <exception>
+#include <functional>
 #include <string>
+#include <typeindex>
+#include <unordered_map>
 
 namespace WindowKit
 {
@@ -16,44 +19,17 @@ namespace WindowKit
         std::string mMessage;
     };
 
-    enum class Event
+    struct WindowClose
     {
-        WindowClose,
-        WindowResize,
     };
 
-    struct EventList
+    struct WindowResize
     {
-        EventList();
-        ~EventList();
-
-        EventList(const EventList& other);
-        EventList(EventList&& other) noexcept;
-
-        EventList& operator=(const EventList& other);
-        EventList& operator=(EventList&& other) noexcept;
-
-        Event& operator[](unsigned int index);
-        const Event& operator[](unsigned int index) const;
-
-        Event* begin();
-        Event* end();
-
-        const Event* begin() const;
-        const Event* end() const;
-
-        unsigned int Size() const;
-
-    private:
-        void Append(Event event);
-        void Purge();
-
-        unsigned int mSize;
-        unsigned int mOccupied;
-        Event* mEvents;
-
-        friend class Window;
+        unsigned int Width;
+        unsigned int Height;
     };
+
+    class Window;
 
     struct WindowDescriptor
     {
@@ -75,14 +51,18 @@ namespace WindowKit
         void Create();
         void Update();
 
-        const EventList& QueryEvents() const;
-
         bool& Fullscreen();
+
+        template <typename EventT, typename... UserData>
+        void SetCallback(void (*callback)(Window&, const EventT&, UserData&...), UserData&... userData);
 
         struct Implementation;
 
     private:
         void Initialise();
+
+        template <typename T>
+        void CallCallback(const T& data);
 
         const char* mTitle;
 
@@ -94,8 +74,10 @@ namespace WindowKit
 
         Implementation* mImplementation;
 
-        EventList mEvents;
+        std::unordered_map<std::type_index, std::function<void(Window&, void*)>> mCallbacks;
 
         static bool mInitialised;
     };
 }
+
+#include "../inline/window.inl"

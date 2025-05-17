@@ -9,7 +9,7 @@
 class WindowKit::Window::Implementation
 {
 public:
-    Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen);
+    Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen);
     ~Implementation();
 
     void Create();
@@ -20,8 +20,8 @@ public:
     bool Running;
     bool& Fullscreen;
     bool PreviousFullscreen;
-    unsigned int Width;
-    unsigned int Height;
+    unsigned int& Width;
+    unsigned int& Height;
     const char* Title;
     bool Resizable;
     bool Resized;
@@ -37,7 +37,7 @@ public:
     static void OnClose(GtkWindow* window, gpointer userData);
 };
 
-WindowKit::Window::Implementation::Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen)
+WindowKit::Window::Implementation::Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen)
     : Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), Running(true), Application(nullptr), Window(nullptr), Header(nullptr), Toolbar(nullptr), Content(nullptr), Resized(false)
 {
 }
@@ -71,10 +71,8 @@ void WindowKit::Window::Implementation::Update()
         PreviousFullscreen = Fullscreen;
     }
 
-    GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(Window));
-
-    unsigned int width = gdk_surface_get_width(surface);
-    unsigned int height = gdk_surface_get_height(surface);
+    unsigned int width = gtk_widget_get_width(Content);
+    unsigned int height = gtk_widget_get_height(Content);
 
     Resized = width != Width or height != Height;
 
@@ -162,18 +160,14 @@ void WindowKit::Window::Update()
 {
     mImplementation->Update();
 
-    mEvents.Purge();
-
     if (not mImplementation->Running)
     {
-        mEvents.Append(Event::WindowClose);
+        CallCallback(WindowClose{});
     }
 
     if (mImplementation->Resized)
     {
-        mEvents.Append(Event::WindowResize);
-
-        mImplementation->Resized = false;
+        CallCallback(WindowResize{.Width = mWidth, .Height = mHeight});
     }
 }
 

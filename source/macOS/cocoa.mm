@@ -9,7 +9,7 @@
 class WindowKit::Window::Implementation
 {
 public:
-    Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen);
+    Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen);
     ~Implementation();
 
     void Create();
@@ -20,8 +20,8 @@ public:
     bool Running;
     bool& Fullscreen;
     bool PreviousFullscreen;
-    unsigned int Width;
-    unsigned int Height;
+    unsigned int& Width;
+    unsigned int& Height;
     const char* Title;
     bool Resizable;
     bool Resized;
@@ -57,7 +57,7 @@ public:
 
 @end
 
-WindowKit::Window::Implementation::Implementation(int width, int height, const char* title, bool resizable, bool& fullscreen)
+WindowKit::Window::Implementation::Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen)
     : Running(true), Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), PreviousFullscreen(false), Window(nil), Delegate(nil)
 {
 }
@@ -182,18 +182,14 @@ void WindowKit::Window::Update()
 {
     mImplementation->Update();
 
-    mEvents.Purge();
-
     if (not mImplementation->Running)
     {
-        mEvents.Append(Event::WindowClose);
+        CallCallback(WindowClose{});
     }
 
     if (mImplementation->Resized)
     {
-        mEvents.Append(Event::WindowResize);
-
-        mImplementation->Resized = false;
+        CallCallback(WindowResize{.Width = mWidth, .Height = mHeight});
     }
 }
 
