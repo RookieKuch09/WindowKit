@@ -2,9 +2,16 @@
 
 #include "../../include/window.hpp"
 
-#include <AppKit/AppKit.h>
+#import <AppKit/AppKit.h>
 #import <Cocoa/Cocoa.h>
-#import <objc/runtime.h>
+
+@interface WindowDelegate : NSObject <NSWindowDelegate>
+@property(nonatomic, assign) WindowKit::Window::Implementation* Implementation;
+@end
+
+@interface ApplicationDelegate : NSObject <NSApplicationDelegate>
+@property(nonatomic, assign) NSWindow* window;
+@end
 
 class WindowKit::Window::Implementation
 {
@@ -14,7 +21,6 @@ public:
 
     void Create();
     void Update();
-
     void ApplyFullscreen();
 
     bool Running;
@@ -27,12 +33,9 @@ public:
     bool Resized;
 
     NSWindow* Window;
-    id Delegate;
+    WindowDelegate* Delegate;
+    ApplicationDelegate* AppDelegate;
 };
-
-@interface WindowDelegate : NSObject <NSWindowDelegate>
-@property(nonatomic, assign) WindowKit::Window::Implementation* Implementation;
-@end
 
 @implementation WindowDelegate
 
@@ -55,15 +58,47 @@ public:
     }
 }
 
+- (void)windowDidMove:(NSNotification*)notification
+{
+    NSWindow* window = notification.object;
+    NSString* key = @"WindowFrame";
+    NSString* frameString = NSStringFromRect([window frame]);
+    [[NSUserDefaults standardUserDefaults] setObject:frameString forKey:key];
+}
+
+@end
+
+@implementation ApplicationDelegate
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)flag
+{
+    if (self.window and not[self.window isVisible])
+    {
+        [self.window makeKeyAndOrderFront:nil];
+    }
+    return YES;
+}
+
 @end
 
 WindowKit::Window::Implementation::Implementation(unsigned int& width, unsigned int& height, const char* title, bool resizable, bool& fullscreen)
-    : Running(true), Width(width), Height(height), Title(title), Resizable(resizable), Fullscreen(fullscreen), PreviousFullscreen(false), Window(nil), Delegate(nil)
+    : Running(true),
+      Width(width),
+      Height(height),
+      Title(title),
+      Resizable(resizable),
+      Fullscreen(fullscreen),
+      PreviousFullscreen(false),
+      Window(nil),
+      Delegate(nil),
+      AppDelegate(nil)
 {
 }
 
 WindowKit::Window::Implementation::~Implementation()
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:NSApp name:NSApplicationDidBecomeActiveNotification object:nil];
+
     if (Window)
     {
         [Window close];
@@ -76,28 +111,69 @@ WindowKit::Window::Implementation::~Implementation()
         [Delegate release];
         Delegate = nil;
     }
+
+    if (AppDelegate)
+    {
+        [NSApp setDelegate:nil];
+        [AppDelegate release];
+        AppDelegate = nil;
+    }
 }
 
 void WindowKit::Window::Implementation::Create()
 {
-    if (not NSApp)
+    if (!NSApp)
     {
         [NSApplication sharedApplication];
     }
 
-    NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable;
+    NSString* appName = [[NSProcessInfo processInfo] processName];
 
+    NSMenu* mainMenu = [[NSMenu alloc] initWithTitle:@"MainMenu"];
+    [NSApp setMainMenu:mainMenu];
+
+    NSMenuItem* appMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    [mainMenu addItem:appMenuItem];
+
+    NSMenu* appMenu = [[NSMenu alloc] initWithTitle:appName];
+
+    NSString* quitTitle = [NSString stringWithFormat:@"Quit %@", appName];
+    NSMenuItem* quitItem = [[NSMenuItem alloc] initWithTitle:quitTitle
+                                                      action:@selector(terminate:)
+                                               keyEquivalent:@"q"];
+    [appMenu addItem:quitItem];
+
+    [appMenuItem setSubmenu:appMenu];
+
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+    NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable;
     if (Resizable)
     {
         style |= NSWindowStyleMaskResizable;
     }
 
-    NSRect frame = NSMakeRect(100, 100, Width, Height);
+    NSString* frameString = [[NSUserDefaults standardUserDefaults] objectForKey:@"WindowFrame"];
+    NSRect frame;
+    if (frameString != nil)
+    {
+        frame = NSRectFromString(frameString);
+    }
+    else
+    {
+        frame = NSMakeRect(0, 0, Width, Height);
+    }
 
-    Window = [[NSWindow alloc] initWithContentRect:frame styleMask:style backing:NSBackingStoreBuffered defer:NO];
+    Window = [[NSWindow alloc] initWithContentRect:frame
+                                         styleMask:style
+                                           backing:NSBackingStoreBuffered
+                                             defer:YES];
 
     [Window setTitle:[NSString stringWithUTF8String:Title]];
-    [Window makeKeyAndOrderFront:nil];
+
+    Delegate = [[WindowDelegate alloc] init];
+    Delegate.Implementation = this;
+    [Window setDelegate:Delegate];
 
     if (Resizable)
     {
@@ -108,17 +184,37 @@ void WindowKit::Window::Implementation::Create()
         [[Window standardWindowButton:NSWindowZoomButton] setHidden:YES];
     }
 
-    Delegate = [[WindowDelegate alloc] init];
+    AppDelegate = [[ApplicationDelegate alloc] init];
+    AppDelegate.window = Window;
+    [NSApp setDelegate:AppDelegate];
 
-    ((WindowDelegate*)Delegate).Implementation = this;
+    [NSApp finishLaunching];
+    [Window makeKeyAndOrderFront:nil];
 
-    [Window setDelegate:Delegate];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [NSApp activateIgnoringOtherApps:YES];
+    });
 
-    if (Fullscreen and Resizable)
+    if (Fullscreen && Resizable)
     {
         ApplyFullscreen();
-
         PreviousFullscreen = true;
+    }
+
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidBecomeActiveNotification
+                                                      object:nil
+                                                       queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification* _Nonnull note) {
+                                                    if (Window && [Window isMiniaturized])
+                                                    {
+                                                        [Window deminiaturize:nil];
+                                                        [Window makeKeyAndOrderFront:nil];
+                                                    }
+                                                  }];
+
+    if (frameString == nil)
+    {
+        [Window center];
     }
 }
 
@@ -128,7 +224,10 @@ void WindowKit::Window::Implementation::Update()
 
     do
     {
-        event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+        event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                   untilDate:[NSDate distantPast]
+                                      inMode:NSDefaultRunLoopMode
+                                     dequeue:YES];
 
         if (event)
         {
@@ -140,20 +239,18 @@ void WindowKit::Window::Implementation::Update()
     if (([Window styleMask] & NSWindowStyleMaskFullScreen) == NSWindowStyleMaskFullScreen)
     {
         Fullscreen = true;
-
         PreviousFullscreen = true;
     }
     else if ((Fullscreen != PreviousFullscreen) and Resizable)
     {
         ApplyFullscreen();
-
         PreviousFullscreen = Fullscreen;
     }
 }
 
 void WindowKit::Window::Implementation::ApplyFullscreen()
 {
-    if (not Window)
+    if (!Window)
     {
         return;
     }
@@ -182,7 +279,7 @@ void WindowKit::Window::Update()
 {
     mImplementation->Update();
 
-    if (not mImplementation->Running)
+    if (!mImplementation->Running)
     {
         CallCallback(WindowClose{});
     }
@@ -190,6 +287,7 @@ void WindowKit::Window::Update()
     if (mImplementation->Resized)
     {
         CallCallback(WindowResize{.Width = mWidth, .Height = mHeight});
+        mImplementation->Resized = false;
     }
 }
 
